@@ -1,2 +1,4 @@
-# opencryptodata
-publicly available chart data on daily basis
+# OpenCryptoData
+Publicly available cryptocurrency chart data on daily basis. Lately, the cryptocurrency market "dip" again. While there are certain volatile tendencies, no free accessible information source exists. Here, we publish daily cryptocurrency chart data free for everyone to see, learn from and create tools that thrive new innovations. A new pool of possibilities is created here in which new types of visualizations, algorithms and tools can unfold. Contributions are welcome.
+
+This repository is licenced under the GPLv3.0, may this information and all derived work of any kind on top of it remain free in future.
