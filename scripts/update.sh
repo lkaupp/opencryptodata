@@ -2,6 +2,6 @@
 @ECHO OFF
 SET /p comment=DailyCommit
 git pull
-git add ../*
+git add *
 git commit -a -m "%comment%"
 git push

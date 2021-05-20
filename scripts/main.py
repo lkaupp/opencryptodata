@@ -91,6 +91,12 @@ def kill_after_a_day(event, next_day_midnight):
         if next_day_midnight < now:
             event.set()
             break
+        #or by key
+        selection = input("Q: Quit")
+        if selection == "Q" or selection == "q":
+            print("Quitting")
+            event.set()
+            break
 
 
 # Collect cryptocurrency information from the following markets:
