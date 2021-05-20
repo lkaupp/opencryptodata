@@ -102,7 +102,7 @@ def kill_after_a_day(event, next_day_midnight):
 # Collect cryptocurrency information from the following markets:
 # - bitstamp
 # Script is designed to run within a 24 hour cronjob
-# 0 0 * * * python3 /opencryptodata/scripts/main.py
+# 0 0 * * * cd /opencryptodata/ && bash ./scripts/update.sh && python3 ./scripts/main.py
 
 if __name__ == "__main__":
     # Start Websocket Data Retrieval
