@@ -6,17 +6,13 @@ import threading
 from datetime import datetime, time, timedelta
 from pathlib import Path
 from time import mktime
-import time as t
+
 import websocket
 import json
 import ssl
 from ruamel.yaml import YAML
 
-import yaml
 
-bitstamp_endpoint = 'wss://ws.bitstamp.net'
-q = queue.Queue(maxsize=0)
-reconnect_event = threading.Event()
 def subscribe_to_channel(ws, channel):
     params = {
         'event': 'bts:subscribe',
@@ -40,9 +36,7 @@ def on_open(ws, config):
     print('all registered')
 
 
-def on_message(ws, data):
-    global q
-    global reconnect_event
+def on_message(ws,  q, reconnect_event, data):
     data = json.loads(data)
     if 'event' in data:
         if data['event'] == 'trade':
@@ -52,9 +46,8 @@ def on_message(ws, data):
 
 
 
-def on_error(ws, msg):
+def on_error(ws, reconnect_event, msg):
     print(msg)
-    global reconnect_event
     reconnect_event.is_set()
 
 def write_header_or_append_line(handle, writer, line):
@@ -79,8 +72,7 @@ def generate_paths_n_channels(coins):
 
 
 
-def csv_writer(event, config):
-    global q
+def csv_writer(event, q, config):
     paths, channels = generate_paths_n_channels(config['markets']['bitstamp']['coins'])
 
     for path in paths:
@@ -90,7 +82,6 @@ def csv_writer(event, config):
     filehdls = [open(path / filename,'a',newline='', encoding='utf-8') for path in paths]
     transformed_files = {channel: [filehdl, csv.writer(filehdl), 0] for path, channel, filehdl in zip(paths, channels, filehdls)}
 
-
     while True:
 
         message = q.get()
@@ -98,7 +89,6 @@ def csv_writer(event, config):
 
         if msg_index > 1:
             channel_name = message['channel'][msg_index:]
-
             transform_array = transformed_files[channel_name]
             write_header_or_append_line(transform_array[0], transform_array[1], message)
             transformed_files[channel_name][2] = transform_array[2] + 1
@@ -115,9 +105,9 @@ def csv_writer(event, config):
 
 
 
-def websocket_watcher(reconnect_event, close_event, config):
-    marketdata_ws = websocket.WebSocketApp(config['markets']['bitstamp']['ws_endpoint'], on_open=lambda ws: on_open(ws, config), on_message=on_message,
-                                           on_error=on_error)
+def websocket_watcher(reconnect_event, close_event, q, config):
+    marketdata_ws = websocket.WebSocketApp(config['markets']['bitstamp']['ws_endpoint'], on_open=lambda ws: on_open(ws, config), on_message=lambda ws, data: on_message(ws, q, reconnect_event, data),
+                                           on_error=lambda ws: on_error(ws, reconnect_event))
     wst = threading.Thread(target=marketdata_ws.run_forever, kwargs={'sslopt': {'cert_reqs': ssl.CERT_NONE}})
     wst.start()
     while True:
@@ -182,16 +172,18 @@ if __name__ == "__main__":
     # Start Websocket Data Retrieval
     # Create a Threading Event to signal shutdown between threads
     final_event = threading.Event()
+    q = queue.Queue(maxsize=0)
+    reconnect_event = threading.Event()
 
     # Create a WSWatcher thread that restart the WS connection if error appeared or we get asked for a reconnect
-    wst = threading.Thread(target=websocket_watcher, kwargs={'reconnect_event': reconnect_event, 'close_event': final_event, 'config': config}, daemon=True)
+    wst = threading.Thread(target=websocket_watcher, kwargs={'reconnect_event': reconnect_event, 'close_event': final_event, 'q': q, 'config': config}, daemon=True)
     wst.start()
 
     # Event to signal stop between Threads
     event = threading.Event()
 
     # Create CSVWriter, turn WSMessages to CSV
-    writer = threading.Thread(target=csv_writer, kwargs={'event': event, 'config': config})
+    writer = threading.Thread(target=csv_writer, kwargs={'event': event, 'q': q, 'config': config})
     writer.start()
 
     # Starting at midnight and add 24 hours for the next midnight (date the script shutdowns all threads) and convert the end date to a unix timestamp
