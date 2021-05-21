@@ -12,6 +12,7 @@ import ssl
 
 bitstamp_endpoint = 'wss://ws.bitstamp.net'
 q = queue.Queue(maxsize=0)
+reconnect_event = threading.Event()
 def subscribe_to_channel(ws, channel):
     params = {
         'event': 'bts:subscribe',
@@ -33,14 +34,20 @@ def on_open(ws):
 
 def on_message(ws, data):
     global q
+    global reconnect_event
     data = json.loads(data)
     if 'event' in data:
         if data['event'] == 'trade':
             q.put(data)
+        elif data['event'] == 'bts:request_reconnect':
+            reconnect_event.is_set()
+
 
 
 def on_error(ws, msg):
     print(msg)
+    global reconnect_event
+    reconnect_event.is_set()
 
 def write_header_or_append_line(handle, writer, line):
     if handle.tell() == 0:
@@ -83,7 +90,31 @@ def csv_writer(event):
         btcusd.close()
 
 
-def kill_after_a_day(event, next_day_midnight):
+
+def websocket_watcher(reconnect_event, close_event):
+    marketdata_ws = websocket.WebSocketApp(bitstamp_endpoint, on_open=on_open, on_message=on_message,
+                                           on_error=on_error)
+    wst = threading.Thread(target=marketdata_ws.run_forever, kwargs={'sslopt': {'cert_reqs': ssl.CERT_NONE}})
+    wst.start()
+    while True:
+        #asked for reconnect or error appeared  = restart WS by close socket and restart thread
+        if reconnect_event.is_set():
+
+            reconnect_event.clear()
+            marketdata_ws.close()
+            wst.join()
+
+            wst = threading.Thread(target=marketdata_ws.run_forever, kwargs={'sslopt': {'cert_reqs': ssl.CERT_NONE}})
+            wst.start()
+
+        if close_event.is_set():
+            marketdata_ws.close()
+            wst.join()
+            break
+
+
+
+def kill_after_a_day(event, next_day_midnight,reconnect_event):
     while True:
         dt = datetime.now()
         sec_since_epoch = mktime(dt.timetuple()) + dt.microsecond / 1000000.0
@@ -97,6 +128,11 @@ def kill_after_a_day(event, next_day_midnight):
             print("Quitting")
             event.set()
             break
+        if selection == "s":
+            print("simulate reconnect")
+            reconnect_event.set()
+
+
 
 
 # Collect cryptocurrency information from the following markets:
@@ -106,30 +142,35 @@ def kill_after_a_day(event, next_day_midnight):
 
 if __name__ == "__main__":
     # Start Websocket Data Retrieval
-    marketdata_ws = websocket.WebSocketApp(bitstamp_endpoint, on_open=on_open, on_message=on_message,on_error=on_error)
-    wst = threading.Thread(target=marketdata_ws.run_forever, kwargs={'sslopt': {'cert_reqs': ssl.CERT_NONE} }, daemon=True)
+    # Create a Threading Event to signal shutdown between threads
+    final_event = threading.Event()
+
+    # Create a WSWatcher thread that restart the WS connection if error appeared or we get asked for a reconnect
+    wst = threading.Thread(target=websocket_watcher, kwargs={'reconnect_event': reconnect_event, 'close_event': final_event}, daemon=True)
     wst.start()
 
-    # Create a Threading Event to signal shutdown between threads
+    # Event to signal stop between Threads
     event = threading.Event()
 
     # Create CSVWriter, turn WSMessages to CSV
     writer = threading.Thread(target=csv_writer, kwargs={'event': event})
     writer.start()
 
-    # Starting midnight and add 24 hours for the next midnight (date the script shutdowns all threads) and the conversion to unix timestamp
+    # Starting at midnight and add 24 hours for the next midnight (date the script shutdowns all threads) and convert the end date to a unix timestamp
     dt = datetime.combine(datetime.today().date(), time.min) + timedelta(hours=24)
     sec_since_epoch = mktime(dt.timetuple()) + dt.microsecond / 1000000.0
     next_day_midnight = sec_since_epoch * 1000
 
     # Thread that signals the writer to finish and shut down
-    killer = threading.Thread(target=kill_after_a_day, kwargs={'event': event, 'next_day_midnight': next_day_midnight})
+    killer = threading.Thread(target=kill_after_a_day, kwargs={'event': event, 'next_day_midnight': next_day_midnight, 'reconnect_event': reconnect_event})
     killer.start()
     killer.join()
     writer.join()
+    #All threads are gracefully closed. Close the WS and its watcher thread
+    final_event.set()
 
-    # After the writer closed gracefully after 24 hours the websocket connection will be closed and the WSThread is finally shutdown
-    marketdata_ws.close()
+
+
 
 
 
