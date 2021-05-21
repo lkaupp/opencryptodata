@@ -103,7 +103,7 @@ markets:
       usdc:
         - usd
         - eur
-      dia:
+      dai:
         - usd
       pax:
         - usd
