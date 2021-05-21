@@ -97,10 +97,20 @@ def websocket_watcher(reconnect_event, close_event):
     wst = threading.Thread(target=marketdata_ws.run_forever, kwargs={'sslopt': {'cert_reqs': ssl.CERT_NONE}})
     wst.start()
     while True:
+
+
         #asked for reconnect or error appeared  = restart WS by close socket and restart thread
         if reconnect_event.is_set():
 
             reconnect_event.clear()
+            marketdata_ws.close()
+            wst.join()
+
+            wst = threading.Thread(target=marketdata_ws.run_forever, kwargs={'sslopt': {'cert_reqs': ssl.CERT_NONE}})
+            wst.start()
+
+        #reconnect if connection gets lost
+        if not wst.is_alive():
             marketdata_ws.close()
             wst.join()
 
