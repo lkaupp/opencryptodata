@@ -34,7 +34,6 @@ def on_open(ws, config):
     print('register to:')
     _, channels = generate_paths_n_channels(config['markets']['bitstamp']['coins'])
     for channel in channels:
-        t.sleep(1)
         print('-' + channel)
         subscribe_to_channel(ws, channel)
 
@@ -99,6 +98,7 @@ def csv_writer(event, config):
 
         if msg_index > 1:
             channel_name = message['channel'][msg_index:]
+
             transform_array = transformed_files[channel_name]
             write_header_or_append_line(transform_array[0], transform_array[1], message)
             transformed_files[channel_name][2] = transform_array[2] + 1
