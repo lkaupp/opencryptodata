@@ -1,0 +1,113 @@
+markets:
+  bitstamp:
+    ws_endpoint: 'wss://ws.bitstamp.net'
+    coins:
+      btc:
+        - usd
+        - eur
+        - gbp
+        - pax
+        - usdc
+      gbp:
+        - usd
+        - eur
+      eur:
+        - usd
+      eth:
+        - usd
+        - eur
+        - btc
+        - gbp
+        - pax
+        - usdc
+      xrp:
+        - usd
+        - eur
+        - btc
+        - gbp
+        - pax
+      uni:
+        - usd
+        - eur
+        - btc
+      ltc:
+        - usd
+        - eur
+        - btc
+        - gbp
+      link:
+        - usd
+        - eur
+        - gbp
+        - btc
+        - eth
+      xlm:
+        - btc
+        - usd
+        - eur
+        - gbp
+      bch:
+        - usd
+        - eur
+        - btc
+        - gbp
+      aave:
+        - usd
+        - eur
+        - btc
+      algo:
+        - usd
+        - eur
+        - btc
+      snx:
+        - usd
+        - eur
+        - btc
+      bat:
+        - usd
+        - eur
+        - btc
+      mkr:
+        - usd
+        - eur
+        - btc
+      zrx:
+        - usd
+        - eur
+        - btc
+      yfi:
+        - usd
+        - eur
+        - btc
+      uma:
+        - usd
+        - eur
+        - btc
+      omg:
+        - usd
+        - eur
+        - gbp
+        - btc
+      knc:
+        - usd
+        - eur
+        - btc
+      crv:
+        - usd
+        - eur
+        - btc
+      audio:
+        - usd
+        - eur
+        - btc
+      usdc:
+        - usd
+        - eur
+      dia:
+        - usd
+      pax:
+        - usd
+        - eur
+        - gbp
+      gusd:
+        - usd

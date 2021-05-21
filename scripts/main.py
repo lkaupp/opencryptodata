@@ -4,11 +4,15 @@ import csv
 import queue
 import threading
 from datetime import datetime, time, timedelta
+from pathlib import Path
 from time import mktime
-
+import time as t
 import websocket
 import json
 import ssl
+from ruamel.yaml import YAML
+
+import yaml
 
 bitstamp_endpoint = 'wss://ws.bitstamp.net'
 q = queue.Queue(maxsize=0)
@@ -23,13 +27,18 @@ def subscribe_to_channel(ws, channel):
     params_json = json.dumps(params)
     ws.send(params_json)
 
-def subscribe_marketdata(ws):
-    subscribe_to_channel(ws,'btcusd')
-    subscribe_to_channel(ws,'btceur')
 
-def on_open(ws):
+def on_open(ws, config):
     print('web-socket connected.')
-    subscribe_marketdata(ws)
+
+    print('register to:')
+    _, channels = generate_paths_n_channels(config['markets']['bitstamp']['coins'])
+    for channel in channels:
+        t.sleep(1)
+        print('-' + channel)
+        subscribe_to_channel(ws, channel)
+
+    print('all registered')
 
 
 def on_message(ws, data):
@@ -57,42 +66,57 @@ def write_header_or_append_line(handle, writer, line):
     row.append(f'{line["data"]["price"]:.2f}')
     writer.writerow(row)
 
-def csv_writer(event):
+
+def generate_paths_n_channels(coins):
+    paths = []
+    channels = []
+
+    for key, values in coins.items():
+        for value in values:
+            paths.append(Path(str(key).upper() + '_' + str(value).upper()))
+            channels.append(str(key)+str(value))
+
+    return paths, channels
+
+
+
+def csv_writer(event, config):
     global q
+    paths, channels = generate_paths_n_channels(config['markets']['bitstamp']['coins'])
+
+    for path in paths:
+        path.mkdir(parents=True, exist_ok=True)
+
     filename = datetime.now().strftime('%d_%m_%Y.csv')
-    with open("BITCOIN_USD/"+filename, 'a',newline='', encoding='utf-8') as btcusd,\
-        open("BITCOIN_EUR/"+filename, 'a',newline='', encoding='utf-8') as btceur:
+    filehdls = [open(path / filename,'a',newline='', encoding='utf-8') for path in paths]
+    transformed_files = {channel: [filehdl, csv.writer(filehdl), 0] for path, channel, filehdl in zip(paths, channels, filehdls)}
 
-        csv_btcusd = csv.writer(btcusd)
-        csv_btceur = csv.writer(btceur)
-        counter = 0
-        while True:
 
-            message = q.get()
+    while True:
 
-            counter = counter+1
+        message = q.get()
+        msg_index = str(message['channel']).rfind('_') + 1
 
-            if 'btceur' in message['channel']:
-                write_header_or_append_line(btceur, csv_btceur, message)
-            elif 'btcusd' in message['channel']:
-                write_header_or_append_line(btcusd, csv_btcusd, message)
+        if msg_index > 1:
+            channel_name = message['channel'][msg_index:]
+            transform_array = transformed_files[channel_name]
+            write_header_or_append_line(transform_array[0], transform_array[1], message)
+            transformed_files[channel_name][2] = transform_array[2] + 1
 
-            if counter == 100:
-                btcusd.flush()
-                btceur.flush()
-                counter = 0
+            if(transformed_files[channel_name][2] == 100):
+                transformed_files[channel_name][2] = 0
+                transform_array[0].flush()
 
-            if event.is_set() and q.empty():
+        if event.is_set() and q.empty():
+            break
 
-                break
-
-        btceur.close()
-        btcusd.close()
+    for key in transformed_files:
+        transformed_files[key][0].close()
 
 
 
-def websocket_watcher(reconnect_event, close_event):
-    marketdata_ws = websocket.WebSocketApp(bitstamp_endpoint, on_open=on_open, on_message=on_message,
+def websocket_watcher(reconnect_event, close_event, config):
+    marketdata_ws = websocket.WebSocketApp(config['markets']['bitstamp']['ws_endpoint'], on_open=lambda ws: on_open(ws, config), on_message=on_message,
                                            on_error=on_error)
     wst = threading.Thread(target=marketdata_ws.run_forever, kwargs={'sslopt': {'cert_reqs': ssl.CERT_NONE}})
     wst.start()
@@ -151,19 +175,23 @@ def kill_after_a_day(event, next_day_midnight,reconnect_event):
 # 0 0 * * * cd /opencryptodata/ && bash ./scripts/update.sh && python3 ./scripts/main.py
 
 if __name__ == "__main__":
+    yaml = YAML(typ='safe')
+    with open('scripts/collector.yaml') as config_hdl:
+        config = yaml.load(config_hdl)
+
     # Start Websocket Data Retrieval
     # Create a Threading Event to signal shutdown between threads
     final_event = threading.Event()
 
     # Create a WSWatcher thread that restart the WS connection if error appeared or we get asked for a reconnect
-    wst = threading.Thread(target=websocket_watcher, kwargs={'reconnect_event': reconnect_event, 'close_event': final_event}, daemon=True)
+    wst = threading.Thread(target=websocket_watcher, kwargs={'reconnect_event': reconnect_event, 'close_event': final_event, 'config': config}, daemon=True)
     wst.start()
 
     # Event to signal stop between Threads
     event = threading.Event()
 
     # Create CSVWriter, turn WSMessages to CSV
-    writer = threading.Thread(target=csv_writer, kwargs={'event': event})
+    writer = threading.Thread(target=csv_writer, kwargs={'event': event, 'config': config})
     writer.start()
 
     # Starting at midnight and add 24 hours for the next midnight (date the script shutdowns all threads) and convert the end date to a unix timestamp
