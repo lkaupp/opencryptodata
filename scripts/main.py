@@ -50,12 +50,17 @@ def on_error(ws, reconnect_event, msg):
     print(msg)
     reconnect_event.is_set()
 
-def write_header_or_append_line(handle, writer, line):
+def write_header_or_append_line(handle, writer, line, print_long_price):
     if handle.tell() == 0:
         writer.writerow(['timestamp ms', 'type', 'amount', 'price'])
     row = list(map(lambda x: line['data'][x], ['microtimestamp', 'type']))
     row.append(f'{line["data"]["amount"]:.8f}')
-    row.append(f'{line["data"]["price"]:.2f}')
+
+    if print_long_price:
+        row.append(f'{line["data"]["price"]:.8f}')
+    else:
+        row.append(f'{line["data"]["price"]:.2f}')
+
     writer.writerow(row)
 
 
@@ -90,7 +95,15 @@ def csv_writer(event, q, config):
         if msg_index > 1:
             channel_name = message['channel'][msg_index:]
             transform_array = transformed_files[channel_name]
-            write_header_or_append_line(transform_array[0], transform_array[1], message)
+
+            in_eth = channel_name.rfind('eth') > 0
+            in_btc = channel_name.rfind('btc') > 0
+
+            if in_eth or in_btc:
+                write_header_or_append_line(transform_array[0], transform_array[1], message, True)
+            else:
+                write_header_or_append_line(transform_array[0], transform_array[1], message, False)
+                
             transformed_files[channel_name][2] = transform_array[2] + 1
 
             if(transformed_files[channel_name][2] == 100):
