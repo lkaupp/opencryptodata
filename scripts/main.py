@@ -59,7 +59,7 @@ def write_header_or_append_line(handle, writer, line, print_long_price):
     if print_long_price:
         row.append(f'{line["data"]["price"]:.8f}')
     else:
-        row.append(f'{line["data"]["price"]:.2f}')
+        row.append(f'{line["data"]["price"]:.4f}')
 
     writer.writerow(row)
 
@@ -103,7 +103,7 @@ def csv_writer(event, q, config):
                 write_header_or_append_line(transform_array[0], transform_array[1], message, True)
             else:
                 write_header_or_append_line(transform_array[0], transform_array[1], message, False)
-                
+
             transformed_files[channel_name][2] = transform_array[2] + 1
 
             if(transformed_files[channel_name][2] == 100):
