@@ -11,7 +11,7 @@ import websocket
 import json
 import ssl
 from ruamel.yaml import YAML
-
+import prctl
 
 def subscribe_to_channel(ws, channel):
     params = {
@@ -78,6 +78,7 @@ def generate_paths_n_channels(coins):
 
 
 def csv_writer(event, q, config):
+    prctl.set_name("csvwriter")
     paths, channels = generate_paths_n_channels(config['markets']['bitstamp']['coins'])
 
     for path in paths:
@@ -119,6 +120,7 @@ def csv_writer(event, q, config):
 
 
 def websocket_watcher(reconnect_event, close_event, q, config):
+    prctl.set_name("websocket watcher")
     marketdata_ws = websocket.WebSocketApp(config['markets']['bitstamp']['ws_endpoint'], on_open=lambda ws: on_open(ws, config), on_message=lambda ws, data: on_message(ws, q, reconnect_event, data),
                                            on_error=lambda ws: on_error(ws, reconnect_event))
     wst = threading.Thread(target=marketdata_ws.run_forever, kwargs={'sslopt': {'cert_reqs': ssl.CERT_NONE}})
@@ -152,6 +154,7 @@ def websocket_watcher(reconnect_event, close_event, q, config):
 
 
 def kill_after_a_day(event, next_day_midnight,reconnect_event):
+    prctl.set_name("killer")
     while True:
         dt = datetime.now()
         sec_since_epoch = mktime(dt.timetuple()) + dt.microsecond / 1000000.0
