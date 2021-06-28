@@ -160,7 +160,7 @@ def kill_after_a_day(event, next_day_midnight,reconnect_event):
         dt = datetime.now()
         sec_since_epoch = mktime(dt.timetuple()) + dt.microsecond / 1000000.0
         now = sec_since_epoch * 1000
-        date_time = now.strftime("%m/%d/%Y, %H:%M:%S")
+        date_time = datetime.utcfromtimestamp(now).strftime("%m/%d/%Y, %H:%M:%S")
         print("now date and time:", date_time)
         if next_day_midnight < now:
             event.set()
@@ -211,7 +211,7 @@ if __name__ == "__main__":
     sec_since_epoch = mktime(dt.timetuple()) + dt.microsecond / 1000000.0
     next_day_midnight = sec_since_epoch * 1000
 
-    date_time = next_day_midnight.strftime("%m/%d/%Y, %H:%M:%S")
+    date_time = datetime.utcfromtimestamp(next_day_midnight).strftime("%m/%d/%Y, %H:%M:%S")
     print("next_day_midnight date and time:", date_time)
 
     # Thread that signals the writer to finish and shut down
