@@ -36,8 +36,7 @@ def on_open(ws, config):
     print('all registered')
 
 
-def on_message(ws,  q, reconnect_event, no_forward, data):
-    if not no_forward.is_set():
+def on_message(ws,  q, reconnect_event, data):
         data = json.loads(data)
         if 'event' in data:
             if data['event'] == 'trade':
@@ -120,9 +119,9 @@ def csv_writer(event, q, config):
 
 
 
-def websocket_watcher(reconnect_event, close_event, no_forward, q, config):
+def websocket_watcher(reconnect_event, close_event, q, config):
     prctl.set_name("websocket watcher")
-    marketdata_ws = websocket.WebSocketApp(config['markets']['bitstamp']['ws_endpoint'], on_open=lambda ws: on_open(ws, config), on_message=lambda ws, data: on_message(ws, q, reconnect_event, no_forward, data),
+    marketdata_ws = websocket.WebSocketApp(config['markets']['bitstamp']['ws_endpoint'], on_open=lambda ws: on_open(ws, config), on_message=lambda ws, data: on_message(ws, q, reconnect_event, data),
                                            on_error=lambda ws: on_error(ws, reconnect_event))
     wst = threading.Thread(target=marketdata_ws.run_forever, kwargs={'sslopt': {'cert_reqs': ssl.CERT_NONE}})
     wst.start()
@@ -197,7 +196,7 @@ if __name__ == "__main__":
     event = threading.Event()
 
     # Create a WSWatcher thread that restart the WS connection if error appeared or we get asked for a reconnect
-    wst = threading.Thread(target=websocket_watcher, kwargs={'reconnect_event': reconnect_event, 'close_event': final_event, 'no_forward': event, 'q': q, 'config': config}, daemon=True)
+    wst = threading.Thread(target=websocket_watcher, kwargs={'reconnect_event': reconnect_event, 'close_event': final_event, 'q': q, 'config': config}, daemon=True)
     wst.start()
 
     # Create CSVWriter, turn WSMessages to CSV
