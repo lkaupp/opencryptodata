@@ -200,10 +200,11 @@ if __name__ == "__main__":
     # Create a WSWatcher thread that restart the WS connection if error appeared or we get asked for a reconnect
     wst = threading.Thread(target=websocket_watcher, kwargs={'reconnect_event': reconnect_event, 'close_event': final_event, 'no_forward': event, 'q': q, 'config': config}, daemon=True)
     wst.start()
-
+    print("wst started")
     # Create CSVWriter, turn WSMessages to CSV
-    writer = threading.Thread(target=csv_writer, kwargs={'event': event, 'q': q, 'config': config})
+    writer = threading.Thread(target=csv_writer, kwargs={'event': event, 'q': q, 'config': config}, daemon=True)
     writer.start()
+    print("writer started")
 
     # Starting at midnight and add 24 hours for the next midnight (date the script shutdowns all threads) and convert the end date to a unix timestamp
     dt = datetime.combine(datetime.today().date(), time.min) + timedelta(hours=24)
