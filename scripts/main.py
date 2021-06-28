@@ -161,7 +161,6 @@ def kill_after_a_day(event, next_day_midnight,reconnect_event):
         sec_since_epoch = mktime(dt.timetuple()) + dt.microsecond / 1000000.0
         now = sec_since_epoch * 1000
 
-        print("now date and time:", now)
         if next_day_midnight < now:
             event.set()
             break
@@ -200,19 +199,15 @@ if __name__ == "__main__":
     # Create a WSWatcher thread that restart the WS connection if error appeared or we get asked for a reconnect
     wst = threading.Thread(target=websocket_watcher, kwargs={'reconnect_event': reconnect_event, 'close_event': final_event, 'no_forward': event, 'q': q, 'config': config}, daemon=True)
     wst.start()
-    print("wst started")
+
     # Create CSVWriter, turn WSMessages to CSV
     writer = threading.Thread(target=csv_writer, kwargs={'event': event, 'q': q, 'config': config}, daemon=True)
     writer.start()
-    print("writer started")
 
     # Starting at midnight and add 24 hours for the next midnight (date the script shutdowns all threads) and convert the end date to a unix timestamp
     dt = datetime.combine(datetime.today().date(), time.min) + timedelta(hours=24)
     sec_since_epoch = mktime(dt.timetuple()) + dt.microsecond / 1000000.0
     next_day_midnight = sec_since_epoch * 1000
-
-    
-    print("next_day_midnight date and time:", next_day_midnight)
 
     # Thread that signals the writer to finish and shut down
     killer = threading.Thread(target=kill_after_a_day, kwargs={'event': event, 'next_day_midnight': next_day_midnight, 'reconnect_event': reconnect_event})
